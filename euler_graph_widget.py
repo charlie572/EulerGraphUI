@@ -16,9 +16,19 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.default_node_color = default_node_color
         self.hover_color = hover_colour
 
+        # trigger mouse move events without clicking the mouse
         self.setMouseTracking(True)
 
         self.graph = nx.Graph()
+
+        # state
+
+        self.mouse_x = None
+        self.mouse_y = None
+
+        # these variables are used when the user clicks and drags to draw an edge
+        self.drawing_edge = False
+        self.edge_start_node = None
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton and event.modifiers() == Qt.ShiftModifier:
@@ -28,11 +38,30 @@ class EulerGraphWidget(QtWidgets.QWidget):
                                 size=self.default_node_size,
                                 color=self.default_node_color,
                                 hovering=True)
+        elif event.button() == Qt.LeftButton and event.modifiers() == Qt.NoModifier:
+            # start drawing an edge if the mouse is hovering over a node
+            self.edge_start_node = self.get_hovered_node()
+            if self.edge_start_node is not None:
+                self.drawing_edge = True
 
-            # invoke a paint event
-            self.update()
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.drawing_edge:
+            # finish drawing an edge
+            end_node = self.get_hovered_node()
+            if end_node is not None and not self.graph.has_edge(self.edge_start_node, end_node):
+                self.graph.add_edge(self.edge_start_node, end_node)
+
+            self.edge_start_node = None
+            self.drawing_edge = False
+
+        self.update()
 
     def mouseMoveEvent(self, event):
+        self.mouse_x = event.x()
+        self.mouse_y = event.y()
+
         # check if the mouse is hovering over any nodes
         for node, data in self.graph.nodes().data():
             x, y, size, *_ = data.values()
@@ -49,8 +78,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
         hover_pen.setWidth(2)
         hover_pen.setColor(self.hover_color)
 
+        no_pen = QtGui.QPen()
+        no_pen.setStyle(Qt.NoPen)
+
         normal_pen = QtGui.QPen()
-        normal_pen.setStyle(Qt.NoPen)
 
         # draw nodes
         for node, data in self.graph.nodes().data():
@@ -63,11 +94,34 @@ class EulerGraphWidget(QtWidgets.QWidget):
             if hovering:
                 painter.setPen(hover_pen)
             else:
-                painter.setPen(normal_pen)
+                painter.setPen(no_pen)
 
             painter.drawEllipse(x - size // 2, y - size // 2, size, size)
 
+        # draw edges
+        painter.setPen(normal_pen)
+        for start_node, end_node in self.graph.edges():
+            start_x = self.graph.nodes[start_node]["x"]
+            start_y = self.graph.nodes[start_node]["y"]
+            end_x = self.graph.nodes[end_node]["x"]
+            end_y = self.graph.nodes[end_node]["y"]
+
+            painter.drawLine(start_x, start_y, end_x, end_y)
+
+        # draw an edge (when the user clicks and drags)
+        if self.drawing_edge:
+            painter.setPen(normal_pen)
+            start_node = self.graph.nodes[self.edge_start_node]
+            painter.drawLine(self.mouse_x, self.mouse_y, start_node["x"], start_node["y"])
+
         painter.end()
+
+    def get_hovered_node(self):
+        for node, data in self.graph.nodes().data():
+            if data["hovering"]:
+                return node
+
+        return None
 
 
 def main():
