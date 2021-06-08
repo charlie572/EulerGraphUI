@@ -42,9 +42,7 @@ def point_line_intersect(point, line_x1, line_y1, line_x2, line_y2, min_distance
 
 
 class EulerGraphWidget(QtWidgets.QWidget):
-
-
-    def __init__(self, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
+    def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
                  select_colour=Qt.red, zoom_rate=0.01, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
@@ -58,8 +56,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.setMouseTracking(True)  # trigger mouse move events without clicking the mouse
         self.setFocusPolicy(Qt.ClickFocus)
 
-        self.graph = nx.Graph()
+        self.graph = graph
         self.next_node_id = 0
+        while self.next_node_id in self.graph.nodes:
+            self.next_node_id += 1
 
         # state
 
@@ -292,7 +292,7 @@ def main():
         def __init__(self, *args, **kwargs):
             super(Window, self).__init__(*args, **kwargs)
 
-            graph_widget = EulerGraphWidget(self)
+            graph_widget = EulerGraphWidget(nx.Graph(), self)
             self.setCentralWidget(graph_widget)
             self.setGeometry(0, 0, 480, 360)
 
