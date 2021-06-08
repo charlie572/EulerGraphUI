@@ -183,7 +183,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 data["x"] += self.mouse_x - last_mouse_x
                 data["y"] += self.mouse_y - last_mouse_y
         elif self.moving_nodes:
-            # move nodes
+            # move selected nodes
             for node in self.selected_nodes:
                 self.graph.nodes[node]["x"] += self.mouse_x - last_mouse_x
                 self.graph.nodes[node]["y"] += self.mouse_y - last_mouse_y
