@@ -9,12 +9,14 @@ def point_circle_intersect(point, circle_x, circle_y, circle_diameter):
 
 
 class EulerGraphWidget(QtWidgets.QWidget):
-    def __init__(self, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue, **kwargs):
+    def __init__(self, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
+                 select_colour=Qt.red, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
         self.default_node_color = default_node_color
         self.hover_color = hover_colour
+        self.select_colour = select_colour
 
         # trigger mouse move events without clicking the mouse
         self.setMouseTracking(True)
@@ -27,6 +29,9 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.mouse_y = None
 
         self.hovered_node = None
+        self.selected_nodes = set()
+
+        self.node_being_selected = None
 
         # these variables are used when the user clicks and drags to draw an edge
         self.drawing_edge = False
@@ -39,27 +44,44 @@ class EulerGraphWidget(QtWidgets.QWidget):
             self.graph.add_node(node_id, x=event.x(), y=event.y(),
                                 size=self.default_node_size,
                                 color=self.default_node_color,
-                                hovering=True)
-        elif event.button() == Qt.LeftButton and event.modifiers() == Qt.NoModifier:
-            # start drawing an edge if the mouse is hovering over a node
-            self.edge_start_node = self.hovered_node
-            if self.edge_start_node is not None:
-                self.drawing_edge = True
+                                hovering=True,
+                                selected=False)
+        elif event.button() == Qt.LeftButton:
+            # start selecting the hovered node
+            self.node_being_selected = self.hovered_node
+
+            if event.modifiers() == Qt.NoModifier:
+                # start drawing an edge if the mouse is hovering over a node
+                self.edge_start_node = self.hovered_node
+                if self.edge_start_node is not None:
+                    self.drawing_edge = True
 
         self.update()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton and self.drawing_edge:
-            # finish dragging the mouse
-            end_node = self.hovered_node
-            start_node = self.edge_start_node
+        if event.button() == Qt.LeftButton:
+            if event.modifiers() != Qt.ControlModifier:
+                self.clear_selection()
 
-            if end_node is not None and not self.graph.has_edge(start_node, end_node):
-                # add an edge
-                self.graph.add_edge(start_node, end_node)
+            if event.modifiers() == Qt.NoModifier:
+                if self.drawing_edge:
+                    # finish drawing the edge
+                    end_node = self.hovered_node
+                    start_node = self.edge_start_node
 
-            self.edge_start_node = None
-            self.drawing_edge = False
+                    if end_node is not None and not self.graph.has_edge(start_node, end_node) and \
+                            end_node != start_node:
+                        self.graph.add_edge(start_node, end_node)
+
+                    self.edge_start_node = None
+                    self.drawing_edge = False
+
+            if self.node_being_selected is not None and self.node_being_selected == self.hovered_node:
+                # select this node
+                self.selected_nodes.add(self.node_being_selected)
+                self.graph.nodes[self.node_being_selected]["selected"] = True
+
+            self.node_being_selected = None
 
         self.update()
 
@@ -89,6 +111,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
         hover_pen.setWidth(2)
         hover_pen.setColor(self.hover_color)
 
+        select_pen = QtGui.QPen()
+        select_pen.setWidth(2)
+        select_pen.setColor(self.select_colour)
+
         no_pen = QtGui.QPen()
         no_pen.setStyle(Qt.NoPen)
 
@@ -96,7 +122,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         # draw nodes
         for node, data in self.graph.nodes().data():
-            x, y, size, color, hovering, *_ = data.values()
+            x, y, size, color, hovering, selected, *_ = data.values()
 
             # style the fill
             painter.setBrush(QtGui.QBrush(color, Qt.SolidPattern))
@@ -104,6 +130,8 @@ class EulerGraphWidget(QtWidgets.QWidget):
             # style the outline
             if hovering:
                 painter.setPen(hover_pen)
+            elif selected:
+                painter.setPen(select_pen)
             else:
                 painter.setPen(no_pen)
 
@@ -126,6 +154,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
             painter.drawLine(self.mouse_x, self.mouse_y, start_node["x"], start_node["y"])
 
         painter.end()
+
+    def clear_selection(self):
+        for node in self.selected_nodes:
+            self.graph.nodes[node]["selected"] = False
+
+        self.selected_nodes.clear()
 
 
 def main():
