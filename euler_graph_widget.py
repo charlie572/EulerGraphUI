@@ -50,7 +50,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
             # start selecting the hovered node
             self.node_being_selected = self.hovered_node
 
-            if event.modifiers() == Qt.NoModifier:
+            if event.modifiers() == Qt.AltModifier:
                 # start drawing an edge if the mouse is hovering over a node
                 self.edge_start_node = self.hovered_node
                 if self.edge_start_node is not None:
@@ -63,7 +63,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
             if event.modifiers() != Qt.ControlModifier:
                 self.clear_selection()
 
-            if event.modifiers() == Qt.NoModifier:
+            if event.modifiers() == Qt.AltModifier:
                 if self.drawing_edge:
                     # finish drawing the edge
                     end_node = self.hovered_node
