@@ -108,9 +108,9 @@ class EulerGraphWidget(QtWidgets.QWidget):
             if event.modifiers() != Qt.ControlModifier:
                 self.clear_selection()
 
+            # edge creation
             if event.modifiers() == Qt.AltModifier:
                 if self.drawing_edge:
-                    # finish drawing the edge
                     end_node = self.hovered_node
                     start_node = self.edge_start_node
 
@@ -121,11 +121,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
                     self.edge_start_node = None
                     self.drawing_edge = False
 
+            # node and edge selection
             if self.node_being_selected is not None and self.node_being_selected == self.hovered_node:
-                # select this node
                 self.selected_nodes.add(self.node_being_selected)
             elif self.edge_being_selected is not None and self.edge_being_selected == self.hovered_edge:
-                # select this edge
                 self.selected_edges.add(self.edge_being_selected)
 
             self.node_being_selected = None
@@ -164,13 +163,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
             else:
                 self.hovered_edge = None
 
+        # panning and moving selected nodes
         if self.panning:
-            # pan
             for node, data in self.graph.nodes().data():
                 data["x"] += self.mouse_x - last_mouse_x
                 data["y"] += self.mouse_y - last_mouse_y
         elif self.moving_nodes:
-            # move selected nodes
             for node in self.selected_nodes:
                 self.graph.nodes[node]["x"] += self.mouse_x - last_mouse_x
                 self.graph.nodes[node]["y"] += self.mouse_y - last_mouse_y
