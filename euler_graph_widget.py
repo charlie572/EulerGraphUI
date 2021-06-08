@@ -51,10 +51,11 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.hover_color = hover_colour
         self.select_colour = select_colour
 
-        # trigger mouse move events without clicking the mouse
-        self.setMouseTracking(True)
+        self.setMouseTracking(True)  # trigger mouse move events without clicking the mouse
+        self.setFocusPolicy(Qt.ClickFocus)
 
         self.graph = nx.Graph()
+        self.next_node_id = 0
 
         # state
 
@@ -77,13 +78,13 @@ class EulerGraphWidget(QtWidgets.QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton and event.modifiers() == Qt.ShiftModifier:
             # create node
-            node_id = len(self.graph)
-            self.graph.add_node(node_id, x=event.x(), y=event.y(),
+            self.graph.add_node(self.next_node_id, x=event.x(), y=event.y(),
                                 size=self.default_node_size,
                                 color=self.default_node_color,
                                 hovering=True,
                                 selected=False)
-            self.hovered_node = node_id
+            self.hovered_node = self.next_node_id
+            self.next_node_id += 1
         elif event.button() == Qt.LeftButton:
             # start selecting the hovered node
             self.node_being_selected = self.hovered_node
@@ -173,6 +174,21 @@ class EulerGraphWidget(QtWidgets.QWidget):
             for node in self.selected_nodes:
                 self.graph.nodes[node]["x"] += self.mouse_x - last_mouse_x
                 self.graph.nodes[node]["y"] += self.mouse_y - last_mouse_y
+
+        self.update()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            # delete nodes and edges
+            for node in self.selected_nodes:
+                self.graph.remove_node(node)
+
+            for edge in self.selected_edges:
+                if self.graph.has_edge(*edge):
+                    self.graph.remove_edge(*edge)
+
+            self.selected_nodes.clear()
+            self.selected_edges.clear()
 
         self.update()
 
