@@ -43,13 +43,15 @@ def point_line_intersect(point, line_x1, line_y1, line_x2, line_y2, min_distance
 
 class EulerGraphWidget(QtWidgets.QWidget):
     def __init__(self, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
-                 select_colour=Qt.red, **kwargs):
+                 select_colour=Qt.red, zoom_rate=0.01, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
         self.default_node_color = default_node_color
         self.hover_color = hover_colour
         self.select_colour = select_colour
+
+        self.zoom_rate = zoom_rate
 
         self.setMouseTracking(True)  # trigger mouse move events without clicking the mouse
         self.setFocusPolicy(Qt.ClickFocus)
@@ -200,6 +202,24 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
             self.selected_nodes.clear()
             self.selected_edges.clear()
+
+        self.update()
+
+    def wheelEvent(self, event):
+        # zoom
+
+        # calculate scale factor
+        if event.angleDelta().y() > 0:
+            # zoom in
+            scale_factor = event.angleDelta().y() * self.zoom_rate
+        else:
+            # zoom out
+            scale_factor = -1 / (event.angleDelta().y() * self.zoom_rate)
+
+        # multiply all positions by the scale factor
+        for node, data in self.graph.nodes().data():
+            data["x"] = int((data["x"] - self.mouse_x) * scale_factor + self.mouse_x)
+            data["y"] = int((data["y"] - self.mouse_y) * scale_factor + self.mouse_y)
 
         self.update()
 
