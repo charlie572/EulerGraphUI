@@ -81,12 +81,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton and event.modifiers() == Qt.ShiftModifier:
-            # create node
-            self.graph.add_node(self.next_node_id, x=event.x(), y=event.y(),
-                                size=self.default_node_size,
-                                color=self.default_node_color)
-            self.hovered_node = self.next_node_id
-            self.next_node_id += 1
+            self.create_node(event.x(), event.y())
         elif event.button() == Qt.LeftButton:
             # start selecting the hovered node
             self.node_being_selected = self.hovered_node
@@ -121,7 +116,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
                     if end_node is not None and not self.graph.has_edge(start_node, end_node) and \
                             end_node != start_node:
-                        self.graph.add_edge(start_node, end_node)
+                        self.add_edge(start_node, end_node)
 
                     self.edge_start_node = None
                     self.drawing_edge = False
@@ -276,6 +271,20 @@ class EulerGraphWidget(QtWidgets.QWidget):
     def clear_selection(self):
         self.selected_nodes.clear()
         self.selected_edges.clear()
+
+    def create_node(self, x, y, size=None, color=None):
+        if size is None:
+            size = self.default_node_size
+
+        if color is None:
+            color = self.default_node_color
+
+        self.graph.add_node(self.next_node_id, x=x, y=y, size=size, color=color)
+        self.hovered_node = self.next_node_id
+        self.next_node_id += 1
+
+    def add_edge(self, start_node, end_node):
+        self.graph.add_edge(start_node, end_node)
 
 
 def main():
