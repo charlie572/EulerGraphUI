@@ -26,6 +26,8 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.mouse_x = None
         self.mouse_y = None
 
+        self.hovered_node = None
+
         # these variables are used when the user clicks and drags to draw an edge
         self.drawing_edge = False
         self.edge_start_node = None
@@ -40,7 +42,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
                                 hovering=True)
         elif event.button() == Qt.LeftButton and event.modifiers() == Qt.NoModifier:
             # start drawing an edge if the mouse is hovering over a node
-            self.edge_start_node = self.get_hovered_node()
+            self.edge_start_node = self.hovered_node
             if self.edge_start_node is not None:
                 self.drawing_edge = True
 
@@ -48,10 +50,13 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.drawing_edge:
-            # finish drawing an edge
-            end_node = self.get_hovered_node()
-            if end_node is not None and not self.graph.has_edge(self.edge_start_node, end_node):
-                self.graph.add_edge(self.edge_start_node, end_node)
+            # finish dragging the mouse
+            end_node = self.hovered_node
+            start_node = self.edge_start_node
+
+            if end_node is not None and not self.graph.has_edge(start_node, end_node):
+                # add an edge
+                self.graph.add_edge(start_node, end_node)
 
             self.edge_start_node = None
             self.drawing_edge = False
@@ -67,6 +72,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
             x, y, size, *_ = data.values()
 
             data["hovering"] = point_circle_intersect(event.pos(), x, y, size)
+
+            if data["hovering"]:
+                self.hovered_node = node
+                break
+        else:
+            self.hovered_node = None
 
         self.update()
 
@@ -115,13 +126,6 @@ class EulerGraphWidget(QtWidgets.QWidget):
             painter.drawLine(self.mouse_x, self.mouse_y, start_node["x"], start_node["y"])
 
         painter.end()
-
-    def get_hovered_node(self):
-        for node, data in self.graph.nodes().data():
-            if data["hovering"]:
-                return node
-
-        return None
 
 
 def main():
