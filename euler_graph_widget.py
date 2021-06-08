@@ -33,6 +33,8 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         self.node_being_selected = None
 
+        self.moving_nodes = False
+
         # these variables are used when the user clicks and drags to draw an edge
         self.drawing_edge = False
         self.edge_start_node = None
@@ -55,11 +57,17 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 self.edge_start_node = self.hovered_node
                 if self.edge_start_node is not None:
                     self.drawing_edge = True
+            elif event.modifiers() == Qt.ShiftModifier:
+                # start moving nodes if the mouse is hovering over a node
+                if self.hovered_node is not None:
+                    self.moving_nodes = True
 
         self.update()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
+            self.moving_nodes = False
+
             if event.modifiers() != Qt.ControlModifier:
                 self.clear_selection()
 
@@ -86,6 +94,8 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.update()
 
     def mouseMoveEvent(self, event):
+        last_mouse_x = self.mouse_x
+        last_mouse_y = self.mouse_y
         self.mouse_x = event.x()
         self.mouse_y = event.y()
 
@@ -100,6 +110,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 break
         else:
             self.hovered_node = None
+
+        # move nodes
+        if self.moving_nodes:
+            for node in self.selected_nodes:
+                self.graph.nodes[node]["x"] += self.mouse_x - last_mouse_x
+                self.graph.nodes[node]["y"] += self.mouse_y - last_mouse_y
 
         self.update()
 
