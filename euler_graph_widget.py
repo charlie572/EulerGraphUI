@@ -42,6 +42,8 @@ def point_line_intersect(point, line_x1, line_y1, line_x2, line_y2, min_distance
 
 
 class EulerGraphWidget(QtWidgets.QWidget):
+
+
     def __init__(self, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
                  select_colour=Qt.red, zoom_rate=0.01, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
@@ -81,7 +83,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton and event.modifiers() == Qt.ShiftModifier:
-            self.create_node(event.x(), event.y())
+            self.createNode(event.x(), event.y())
         elif event.button() == Qt.LeftButton:
             # start selecting the hovered node
             self.node_being_selected = self.hovered_node
@@ -106,7 +108,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
             self.moving_nodes = False
 
             if event.modifiers() != Qt.ControlModifier:
-                self.clear_selection()
+                self.clearSelection()
 
             # edge creation
             if event.modifiers() == Qt.AltModifier:
@@ -116,7 +118,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
                     if end_node is not None and not self.graph.has_edge(start_node, end_node) and \
                             end_node != start_node:
-                        self.add_edge(start_node, end_node)
+                        self.addEdge(start_node, end_node)
 
                     self.edge_start_node = None
                     self.drawing_edge = False
@@ -185,7 +187,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 if self.graph.has_edge(*edge):
                     self.graph.remove_edge(*edge)
 
-            self.clear_selection()
+            self.clearSelection()
 
         self.update()
 
@@ -266,11 +268,11 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         painter.end()
 
-    def clear_selection(self):
+    def clearSelection(self):
         self.selected_nodes.clear()
         self.selected_edges.clear()
 
-    def create_node(self, x, y, size=None, color=None):
+    def createNode(self, x, y, size=None, color=None):
         if size is None:
             size = self.default_node_size
 
@@ -281,7 +283,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.hovered_node = self.next_node_id
         self.next_node_id += 1
 
-    def add_edge(self, start_node, end_node):
+    def addEdge(self, start_node, end_node):
         self.graph.add_edge(start_node, end_node)
 
 
