@@ -43,13 +43,15 @@ def point_line_intersect(point, line_x1, line_y1, line_x2, line_y2, min_distance
 
 class EulerGraphWidget(QtWidgets.QWidget):
     def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
-                 select_colour=Qt.red, zoom_rate=0.01, **kwargs):
+                 select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
         self.default_node_color = default_node_color
         self.hover_color = hover_colour
         self.select_colour = select_colour
+        self.loop_width = loop_width
+        self.loop_height = loop_height
 
         self.zoom_rate = zoom_rate
 
@@ -110,27 +112,26 @@ class EulerGraphWidget(QtWidgets.QWidget):
             if event.modifiers() != Qt.ControlModifier:
                 self.clearSelection()
 
-            # edge creation
             if event.modifiers() == Qt.AltModifier:
+                # edge creation
                 if self.drawing_edge:
                     end_node = self.hovered_node
                     start_node = self.edge_start_node
 
-                    if end_node is not None and not self.graph.has_edge(start_node, end_node) and \
-                            end_node != start_node:
+                    if end_node is not None:
                         self.addEdge(start_node, end_node)
 
                     self.edge_start_node = None
                     self.drawing_edge = False
+            elif event.modifiers() == Qt.NoModifier or event.modifiers() == Qt.ControlModifier:
+                # node and edge selection
+                if self.node_being_selected is not None and self.node_being_selected == self.hovered_node:
+                    self.selected_nodes.add(self.node_being_selected)
+                elif self.edge_being_selected is not None and self.edge_being_selected == self.hovered_edge:
+                    self.selected_edges.add(self.edge_being_selected)
 
-            # node and edge selection
-            if self.node_being_selected is not None and self.node_being_selected == self.hovered_node:
-                self.selected_nodes.add(self.node_being_selected)
-            elif self.edge_being_selected is not None and self.edge_being_selected == self.hovered_edge:
-                self.selected_edges.add(self.edge_being_selected)
-
-            self.node_being_selected = None
-            self.edge_being_selected = None
+                self.node_being_selected = None
+                self.edge_being_selected = None
         elif event.button() == Qt.MiddleButton:
             self.panning = False
 
@@ -143,6 +144,8 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.mouse_y = event.y()
 
         # check if the mouse is hovering over any nodes
+        self.hovered_node = None
+        self.hovered_edge = None
         for node, data in self.graph.nodes().data():
             x, y, size, *_ = data.values()
 
@@ -150,18 +153,28 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 self.hovered_node = node
                 break
         else:
-            self.hovered_node = None
-
-            # check if the mouse is hovering over any edges
+            # check if the mouse is hovering over any edges (this will only run if the mouse isn't hovering over any
+            # nodes)
             for start_node, end_node in self.graph.edges():
-                line_x1 = self.graph.nodes[start_node]["x"]
-                line_y1 = self.graph.nodes[start_node]["y"]
-                line_x2 = self.graph.nodes[end_node]["x"]
-                line_y2 = self.graph.nodes[end_node]["y"]
+                if start_node != end_node:
+                    # regular edge
+                    line_x1 = self.graph.nodes[start_node]["x"]
+                    line_y1 = self.graph.nodes[start_node]["y"]
+                    line_x2 = self.graph.nodes[end_node]["x"]
+                    line_y2 = self.graph.nodes[end_node]["y"]
 
-                if point_line_intersect(event.pos(), line_x1, line_y1, line_x2, line_y2):
-                    self.hovered_edge = (start_node, end_node)
-                    break
+                    if point_line_intersect(event.pos(), line_x1, line_y1, line_x2, line_y2):
+                        self.hovered_edge = (start_node, end_node)
+                        break
+                else:
+                    # loop
+                    x = self.graph.nodes[start_node]["x"]
+                    y = self.graph.nodes[start_node]["y"]
+
+                    rect = QtCore.QRect(x - self.loop_width // 2, y, self.loop_width, self.loop_height)
+                    if rect.contains(event.pos()):
+                        self.hovered_edge = (start_node, end_node)
+                        break
             else:
                 self.hovered_edge = None
 
@@ -244,6 +257,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
             painter.drawEllipse(x - size // 2, y - size // 2, size, size)
 
         # draw edges
+        painter.setBrush(QtGui.QBrush(Qt.NoBrush))
         for start_node, end_node in self.graph.edges():
             start_x = self.graph.nodes[start_node]["x"]
             start_y = self.graph.nodes[start_node]["y"]
@@ -258,7 +272,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
             else:
                 painter.setPen(normal_pen)
 
-            painter.drawLine(start_x, start_y, end_x, end_y)
+            if start_node != end_node:
+                painter.drawLine(start_x, start_y, end_x, end_y)
+            else:
+                painter.drawEllipse(start_x - self.loop_width // 2, start_y, self.loop_width, self.loop_height)
 
         # draw an edge (when the user clicks and drags)
         if self.drawing_edge:
