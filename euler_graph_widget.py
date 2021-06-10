@@ -1,5 +1,5 @@
 from collections import Counter
-from math import atan, cos, sin, degrees, sqrt
+from math import atan, cos, sin, degrees, sqrt, radians, pi
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -97,21 +97,7 @@ def draw_arc_through_points(point1, point2, point3, painter):
     # find the angles on the circle where the three points are (degrees anticlockwise from the positive x axis)
     angles = []
     for point in [point1, point2, point3]:
-        if point.x() == centre.x():
-            if point.y() < centre.y():
-                angle = 90
-            else:
-                angle = 270
-        else:
-            angle = degrees(atan((centre.y() - point.y()) / (point.x() - centre.x())))
-
-        if point.x() < centre.x():
-            angle += 180
-
-        if angle < 0:
-            angle += 360
-
-        angles.append(angle)
+        angles.append(get_angle(point.x() - centre.x(), centre.y() - point.y()))
 
     # find the start angle and the arc length
     min_end = min(angles[0], angles[2])
@@ -130,9 +116,27 @@ def draw_arc_through_points(point1, point2, point3, painter):
     painter.drawArc(rect, start_angle, arc_length)
 
 
+def get_angle(x, y):
+    if x == 0:
+        if y > 0:
+            angle = 90
+        else:
+            angle = 270
+    else:
+        angle = degrees(atan(y / x))
+
+    if x < 0:
+        angle += 180
+
+    angle %= 360
+
+    return angle
+
+
 class EulerGraphWidget(QtWidgets.QWidget):
     def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
-                 select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, multi_edge_spacing=20, **kwargs):
+                 select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, multi_edge_spacing=20,
+                 direction_triangle_size=15, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
@@ -142,6 +146,11 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.loop_width = loop_width
         self.loop_height = loop_height
         self.multi_edge_spacing = multi_edge_spacing
+        self.direction_triangle_size = direction_triangle_size
+        self.direction_triangle_height = sqrt(direction_triangle_size ** 2 - (direction_triangle_size / 2) ** 2)
+
+        self.directed = isinstance(graph, (nx.DiGraph, nx.MultiDiGraph)) or \
+                        issubclass(type(graph), (nx.DiGraph, nx.MultiDiGraph))
 
         self.zoom_rate = zoom_rate
 
@@ -352,7 +361,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
         for start_node, end_node in self.graph.edges():
             # update and access the edge counter
-            edge_count.update([(start_node, end_node)])
+            edge_count.update([(start_node, end_node), (end_node, start_node)])
             edge_number = edge_count[start_node, end_node] - 1
 
             start_x = self.graph.nodes[start_node]["x"]
@@ -373,6 +382,17 @@ class EulerGraphWidget(QtWidgets.QWidget):
                 if edge_number == 0:
                     # straight line
                     painter.drawLine(start_x, start_y, end_x, end_y)
+
+                    if self.directed:
+                        # draw triangle to show direction
+
+                        # first point is in the centre of the line
+                        line_centre = QtCore.QPointF((start_x + end_x) / 2, (start_y + end_y) / 2)
+
+                        # get two perpendicular offset vectors
+                        line_angle = radians(get_angle(end_x - start_x, start_y - end_y))
+
+                        self._draw_direction_triangle(line_centre, line_angle, painter)
                 else:
                     # curved line
 
@@ -380,16 +400,17 @@ class EulerGraphWidget(QtWidgets.QWidget):
                     offset_distance = (edge_number + 1) // 2 * self.multi_edge_spacing
 
                     # calculate an offset vector from the straight line
-                    line_centre = QtCore.QPointF((start_x + end_x) / 2, (start_y + end_y) / 2)
+                    angle = radians(get_angle(end_x - start_x, start_y - end_y) + 90)
+                    offset = QtCore.QPointF(cos(angle) * offset_distance, -sin(angle) * offset_distance)
 
-                    if start_y != end_y:
-                        angle = atan(-(start_x - end_x) / (start_y - end_y))
-                        offset = QtCore.QPointF(cos(angle) * offset_distance, sin(angle) * offset_distance)
-                    else:
-                        offset = QtCore.QPointF(0, -offset_distance)
+                    # If the edge is going in the other direction, the offset needs to be flipped so the edge curves
+                    # in the right direction.
+                    if start_node < end_node:
+                        offset *= -1
 
                     # Add or subtract the offset vector to the centre point of the line. Alternate between adding and
                     # subtracting so that the edges will alternate above and below the line.
+                    line_centre = QtCore.QPointF((start_x + end_x) / 2, (start_y + end_y) / 2)
                     if edge_number % 2 == 0:
                         curve_point = line_centre + offset
                     else:
@@ -402,6 +423,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
                     # draw the curve between the nodes through the calculated point
                     draw_arc_through_points(start_point, curve_point, end_point, painter)
+
+                    if self.directed:
+                        # draw direction arrow
+                        self._draw_direction_triangle(curve_point, angle - pi/2, painter)
             else:
                 # loop
                 painter.drawEllipse(start_x - self.loop_width // 2, start_y, self.loop_width, self.loop_height)
@@ -431,6 +456,20 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def addEdge(self, start_node, end_node):
         self.graph.add_edge(start_node, end_node)
+
+    def _draw_direction_triangle(self, point1, angle, painter):
+        # calculate offset vector along and perpendicular to the line
+        offset1 = -QtCore.QPointF(cos(angle) * self.direction_triangle_height,
+                                  -sin(angle) * self.direction_triangle_height)
+        offset2 = QtCore.QPointF(cos(angle + pi / 2) * self.direction_triangle_size / 2,
+                                 -sin(angle + pi / 2) * self.direction_triangle_size / 2)
+
+        # calculate other two points
+        point2 = point1 + offset1 + offset2
+        point3 = point1 + offset1 - offset2
+
+        # draw the triangle
+        painter.drawPolygon(point1, point2, point3)
 
 
 def main():
