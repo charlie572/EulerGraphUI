@@ -297,20 +297,21 @@ class EulerGraphWidget(QtWidgets.QWidget):
     def wheelEvent(self, event):
         # zoom
 
-        # calculate scale factor
-        if event.angleDelta().y() > 0:
-            # zoom in
-            scale_factor = event.angleDelta().y() * self.zoom_rate
-        else:
-            # zoom out
-            scale_factor = -1 / (event.angleDelta().y() * self.zoom_rate)
+        if event.angleDelta().y() != 0:
+            # calculate scale factor
+            if event.angleDelta().y() > 0:
+                # zoom in
+                scale_factor = event.angleDelta().y() * self.zoom_rate
+            else:
+                # zoom out
+                scale_factor = -1 / (event.angleDelta().y() * self.zoom_rate)
 
-        # multiply all positions by the scale factor
-        for node, data in self.graph.nodes().data():
-            data["x"] = int((data["x"] - self.mouse_x) * scale_factor + self.mouse_x)
-            data["y"] = int((data["y"] - self.mouse_y) * scale_factor + self.mouse_y)
+            # multiply all positions by the scale factor
+            for node, data in self.graph.nodes().data():
+                data["x"] = int((data["x"] - self.mouse_x) * scale_factor + self.mouse_x)
+                data["y"] = int((data["y"] - self.mouse_y) * scale_factor + self.mouse_y)
 
-        self.update()
+            self.update()
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
