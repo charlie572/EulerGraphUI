@@ -1,3 +1,5 @@
+from math import atan, cos, sin, degrees, sqrt
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 import networkx as nx
@@ -41,9 +43,95 @@ def point_line_intersect(point, line_x1, line_y1, line_x2, line_y2, min_distance
     return squared_distance <= min_distance ** 2
 
 
+def get_bisector(point1, point2):
+    if point1.y() == point2.y():
+        m_2 = 9999999
+    elif point1.x() == point2.x():
+        m_2 = 0
+    else:
+        m_1 = (point1.y() - point2.y()) / (point1.x() - point2.x())
+        m_2 = -1 / m_1
+
+    centre = (point1 + point2) / 2
+    c = centre.y() - m_2 * centre.x()
+
+    return m_2, c
+
+
+def get_line_intersection(m_1, c_1, m_2, c_2):
+    if m_1 == m_2:
+        return None
+
+    x = (c_2 - c_1) / (m_1 - m_2)
+    y = m_1 * x + c_1
+    return QtCore.QPointF(x, y)
+
+
+def get_circle(point1, point2, point3):
+    m_1, c_1 = get_bisector(point1, point2)
+    m_2, c_2 = get_bisector(point2, point3)
+
+    centre = get_line_intersection(m_1, c_1, m_2, c_2)
+    radius = sqrt((point1.x() - centre.x()) ** 2 + (point1.y() - centre.y()) ** 2)
+
+    return centre, radius
+
+
+def draw_arc_through_points(point1, point2, point3, painter):
+    """Draw an arc through the given points in the given order
+
+    :param point1: First point
+    :type point1: QPoint
+    :param point2: Second point
+    :type point2: QPoint
+    :param point3: Third point
+    :type point3: QPoint
+    :param painter: The painter to draw the arc
+    :type painter: QPainter
+    """
+    # boundary rectangle (find a circle through all three points and then create a rectangle around the circle)
+    centre, radius = get_circle(point1, point2, point3)
+    rect = QtCore.QRect(int(centre.x() - radius), int(centre.y() - radius), 2 * int(radius), 2 * int(radius))
+
+    # find the angles on the circle where the three points are (degrees anticlockwise from the positive x axis)
+    angles = []
+    for point in [point1, point2, point3]:
+        if point.x() == centre.x():
+            if point.y() < centre.y():
+                angle = 90
+            else:
+                angle = 270
+        else:
+            angle = degrees(atan((centre.y() - point.y()) / (point.x() - centre.x())))
+
+        if point.x() < centre.x():
+            angle += 180
+
+        if angle < 0:
+            angle += 360
+
+        angles.append(angle)
+
+    # find the start angle and the arc length
+    min_end = min(angles[0], angles[2])
+    max_end = max(angles[0], angles[2])
+    if min_end < angles[1] < max_end:
+        start_angle = min_end
+        arc_length = max_end - start_angle
+    else:
+        start_angle = max_end
+        arc_length = 360 - start_angle + min_end
+
+    # convert the angles to sixteenths of a degree (the format required by Qt)
+    start_angle = int(start_angle) * 16
+    arc_length = int(arc_length) * 16
+
+    painter.drawArc(rect, start_angle, arc_length)
+
+
 class EulerGraphWidget(QtWidgets.QWidget):
     def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
-                 select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, **kwargs):
+                 select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, multi_edge_spacing=20, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
@@ -52,6 +140,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.select_colour = select_colour
         self.loop_width = loop_width
         self.loop_height = loop_height
+        self.multi_edge_spacing = multi_edge_spacing
 
         self.zoom_rate = zoom_rate
 
@@ -258,13 +347,13 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         # draw edges
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
-        for start_node, end_node in self.graph.edges():
+        for start_node, end_node, edge_number in self.graph.edges(keys=True):
             start_x = self.graph.nodes[start_node]["x"]
             start_y = self.graph.nodes[start_node]["y"]
             end_x = self.graph.nodes[end_node]["x"]
             end_y = self.graph.nodes[end_node]["y"]
 
-            # style the line
+            # style the edge
             if self.hovered_edge == (start_node, end_node):
                 painter.setPen(hover_pen)
             elif (start_node, end_node) in self.selected_edges:
@@ -272,9 +361,42 @@ class EulerGraphWidget(QtWidgets.QWidget):
             else:
                 painter.setPen(normal_pen)
 
+            # draw the edge
             if start_node != end_node:
-                painter.drawLine(start_x, start_y, end_x, end_y)
+                if edge_number == 0:
+                    # straight line
+                    painter.drawLine(start_x, start_y, end_x, end_y)
+                else:
+                    # curved line
+
+                    # calculate offset distance, which determines how far the curve is from the line
+                    offset_distance = (edge_number + 1) // 2 * self.multi_edge_spacing
+
+                    # calculate an offset vector from the straight line
+                    line_centre = QtCore.QPointF((start_x + end_x) / 2, (start_y + end_y) / 2)
+
+                    if start_y != end_y:
+                        angle = atan(-(start_x - end_x) / (start_y - end_y))
+                        offset = QtCore.QPointF(cos(angle) * offset_distance, sin(angle) * offset_distance)
+                    else:
+                        offset = QtCore.QPointF(0, -offset_distance)
+
+                    # Add or subtract the offset vector to the centre point of the line. Alternate between adding and
+                    # subtracting so that the edges will alternate above and below the line.
+                    if edge_number % 2 == 0:
+                        curve_point = line_centre + offset
+                    else:
+                        curve_point = line_centre - offset
+
+                    # create integer point objects
+                    start_point = QtCore.QPoint(start_x, start_y)
+                    end_point = QtCore.QPoint(end_x, end_y)
+                    curve_point = QtCore.QPoint(int(curve_point.x()), int(curve_point.y()))
+
+                    # draw the curve between the nodes through the calculated point
+                    draw_arc_through_points(start_point, curve_point, end_point, painter)
             else:
+                # loop
                 painter.drawEllipse(start_x - self.loop_width // 2, start_y, self.loop_width, self.loop_height)
 
         # draw an edge (when the user clicks and drags)
@@ -309,7 +431,7 @@ def main():
         def __init__(self, *args, **kwargs):
             super(Window, self).__init__(*args, **kwargs)
 
-            graph_widget = EulerGraphWidget(nx.Graph(), self)
+            graph_widget = EulerGraphWidget(nx.MultiGraph(), self)
             self.setCentralWidget(graph_widget)
             self.setGeometry(0, 0, 480, 360)
 
