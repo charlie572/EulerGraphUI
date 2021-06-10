@@ -1,3 +1,4 @@
+from collections import Counter
 from math import atan, cos, sin, degrees, sqrt
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -346,8 +347,13 @@ class EulerGraphWidget(QtWidgets.QWidget):
             painter.drawEllipse(x - size // 2, y - size // 2, size, size)
 
         # draw edges
+        edge_count = Counter()  # keeps track of the number of edges encountered between each node pair
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
-        for start_node, end_node, edge_number in self.graph.edges(keys=True):
+        for start_node, end_node in self.graph.edges():
+            # update and access the edge counter
+            edge_count.update([(start_node, end_node)])
+            edge_number = edge_count[start_node, end_node] - 1
+
             start_x = self.graph.nodes[start_node]["x"]
             start_y = self.graph.nodes[start_node]["y"]
             end_x = self.graph.nodes[end_node]["x"]
