@@ -392,6 +392,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
                         # get two perpendicular offset vectors
                         line_angle = radians(get_angle(end_x - start_x, start_y - end_y))
 
+                        painter.setBrush(QtGui.QBrush(Qt.SolidPattern))
                         self._draw_direction_triangle(line_centre, line_angle, painter)
 
                     # move line_edit
@@ -432,6 +433,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
                     if self.directed:
                         # draw direction arrow
+                        painter.setBrush(QtGui.QBrush(Qt.SolidPattern))
                         self._draw_direction_triangle(curve_point, angle - pi/2, painter)
 
                     # move spin box
@@ -441,6 +443,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
                     line_edit.move(curve_point.x() - width // 2, curve_point.y() - height // 2)
             else:
                 # loop
+                painter.setBrush(QtGui.QBrush(Qt.NoBrush))
                 painter.drawEllipse(start_x - self.loop_width // 2, start_y, self.loop_width, self.loop_height)
 
                 # move line edit
