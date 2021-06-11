@@ -359,7 +359,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         # draw edges
         edge_count = Counter()  # keeps track of the number of edges encountered between each node pair
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
-        for start_node, end_node in self.graph.edges():
+        for start_node, end_node, data in self.graph.edges(data=True):
             # update and access the edge counter
             edge_count.update([(start_node, end_node), (end_node, start_node)])
             edge_number = edge_count[start_node, end_node] - 1
@@ -393,6 +393,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
                         line_angle = radians(get_angle(end_x - start_x, start_y - end_y))
 
                         self._draw_direction_triangle(line_centre, line_angle, painter)
+
+                    # move line_edit
+                    line_edit = data["line_edit"]
+                    width = line_edit.width()
+                    height = line_edit.height()
+                    line_edit.move((start_x + end_x) // 2 - width // 2, (start_y + end_y) // 2 - height // 2)
                 else:
                     # curved line
 
@@ -427,9 +433,21 @@ class EulerGraphWidget(QtWidgets.QWidget):
                     if self.directed:
                         # draw direction arrow
                         self._draw_direction_triangle(curve_point, angle - pi/2, painter)
+
+                    # move spin box
+                    line_edit = data["line_edit"]
+                    width = line_edit.width()
+                    height = line_edit.height()
+                    line_edit.move(curve_point.x() - width // 2, curve_point.y() - height // 2)
             else:
                 # loop
                 painter.drawEllipse(start_x - self.loop_width // 2, start_y, self.loop_width, self.loop_height)
+
+                # move line edit
+                line_edit = data["line_edit"]
+                width = line_edit.width()
+                height = line_edit.height()
+                data["line_edit"].move(start_x - width // 2, start_y + self.loop_height - height // 2)
 
         # draw an edge (when the user clicks and drags)
         if self.drawing_edge:
@@ -455,7 +473,20 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.next_node_id += 1
 
     def addEdge(self, start_node, end_node):
-        self.graph.add_edge(start_node, end_node)
+        # create a line edit to view and change the weight
+        line_edit = QtWidgets.QLineEdit("1", self)
+
+        line_edit.setFixedWidth(20)
+        line_edit.setFixedHeight(20)
+        line_edit.setFrame(False)
+        line_edit.setAutoFillBackground(True)
+        line_edit.setStyleSheet("""background-color: transparent;
+                                   color: red;
+                                   font-size: 15px""")
+
+        line_edit.show()
+
+        self.graph.add_edge(start_node, end_node, line_edit=line_edit)
 
     def _draw_direction_triangle(self, point1, angle, painter):
         # calculate offset vector along and perpendicular to the line
@@ -477,7 +508,7 @@ def main():
         def __init__(self, *args, **kwargs):
             super(Window, self).__init__(*args, **kwargs)
 
-            graph_widget = EulerGraphWidget(nx.MultiGraph(), self)
+            graph_widget = EulerGraphWidget(nx.DiGraph(), self)
             self.setCentralWidget(graph_widget)
             self.setGeometry(0, 0, 480, 360)
 
