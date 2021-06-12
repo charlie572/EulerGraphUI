@@ -200,11 +200,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
                  select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, multi_edge_spacing=20,
-                 direction_triangle_size=15, **kwargs):
+                 direction_triangle_size=15, default_edge_color=Qt.black, **kwargs):
         super(EulerGraphWidget, self).__init__(*args, **kwargs)
 
         self.default_node_size = default_node_size
         self.default_node_color = default_node_color
+        self.default_edge_color = default_edge_color
         self.hover_color = hover_colour
         self.select_colour = select_colour
         self.loop_width = loop_width
@@ -521,7 +522,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.hovered_node = self.next_node_id
         self.next_node_id += 1
 
-    def addEdge(self, start_node, end_node):
+    def addEdge(self, start_node, end_node, color=None):
+        if color is None:
+            color = self.default_edge_color
+
         if self.multi_edge:
             edge_num = num_edges(start_node, end_node, self.graph)
             if not self.directed:
@@ -535,7 +539,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         widget = self.WidgetOnEdge(edge, self)
         widget.show()
 
-        self.graph.add_edge(start_node, end_node, widget=widget)
+        self.graph.add_edge(start_node, end_node, widget=widget, color=color)
 
     def selectEdge(self, edge, multi_select=False):
         if not multi_select:
@@ -565,6 +569,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
         self.clearSelection()
 
         self.update()
+
+    def setNodeColor(self, node, color):
+        self.graph.nodes[node]["color"] = color
+
+    def setEdgeColor(self, edge, color):
+        self.graph.edges[edge]["color"] = color
 
     def _draw_direction_triangle(self, point1, angle, painter):
         # calculate offset vector along and perpendicular to the line
