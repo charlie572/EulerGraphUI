@@ -242,9 +242,10 @@ class EulerGraphWidget(QtWidgets.QWidget):
         if event.button() == Qt.RightButton and event.modifiers() == Qt.ShiftModifier:
             self.createNode(event.x(), event.y())
         elif event.button() == Qt.LeftButton:
-            # start selecting the hovered node
-            self.node_being_selected = self.hovered_node
-            self.edge_being_selected = self.hovered_edge
+            if event.modifiers() != Qt.ControlModifier:
+                self.clearSelection()
+
+            self.selected_nodes.add(self.hovered_node)
 
             if event.modifiers() == Qt.AltModifier:
                 # start drawing an edge if the mouse is hovering over a node
@@ -264,9 +265,6 @@ class EulerGraphWidget(QtWidgets.QWidget):
         if event.button() == Qt.LeftButton:
             self.moving_nodes = False
 
-            if event.modifiers() != Qt.ControlModifier:
-                self.clearSelection()
-
             if event.modifiers() == Qt.AltModifier:
                 # edge creation
                 if self.drawing_edge:
@@ -278,15 +276,6 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
                     self.edge_start_node = None
                     self.drawing_edge = False
-            elif event.modifiers() == Qt.NoModifier or event.modifiers() == Qt.ControlModifier:
-                # node and edge selection
-                if self.node_being_selected is not None and self.node_being_selected == self.hovered_node:
-                    self.selected_nodes.add(self.node_being_selected)
-                elif self.edge_being_selected is not None and self.edge_being_selected == self.hovered_edge:
-                    self.selected_edges.add(self.edge_being_selected)
-
-                self.node_being_selected = None
-                self.edge_being_selected = None
         elif event.button() == Qt.MiddleButton:
             self.panning = False
 
