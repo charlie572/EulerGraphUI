@@ -390,13 +390,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
         edge_count = Counter()  # keeps track of the number of edges encountered between each node pair
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
 
-        # iterate over edges as 2-tuples or 3-tuples depending on if multi-edges are permitted
-        if self.multi_edge:
-            iterator = self.graph.edges(data=True, keys=True)
-        else:
-            iterator = self.graph.edges(data=True)
-
-        for start_node, end_node, *_ in iterator:
+        for start_node, end_node, *_ in self.edges(data=True):
             data = _[-1]
             if len(_) == 2:
                 key = _[0]
@@ -575,6 +569,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def setEdgeColor(self, edge, color):
         self.graph.edges[edge]["color"] = color
+
+    def edges(self, data=False):
+        if self.multi_edge:
+            return self.graph.edges(keys=True, data=data)
+        else:
+            return self.graph.edges(data=data)
 
     def _draw_direction_triangle(self, point1, angle, painter):
         # calculate offset vector along and perpendicular to the line
