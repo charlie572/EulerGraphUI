@@ -135,7 +135,7 @@ def get_angle(x, y):
 
 def num_edges(start_node, end_node, graph):
     result = 0
-    for node1, node2, key in graph.edges(key=True):
+    for node1, node2 in graph.edges():
         if node1 == start_node and node2 == end_node:
             result += 1
 
@@ -152,15 +152,38 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
             self.edge = edge
 
-            self.widget = QtWidgets.QLineEdit("1", self)
-            self.widget.setFrame(False)
-            self.widget.setAutoFillBackground(True)
-            self.widget.setStyleSheet("""background-color: transparent;
+            self.line_edit = QtWidgets.QLineEdit("1", self)
+            self.line_edit.setFrame(False)
+            self.line_edit.setAutoFillBackground(True)
+            self.line_edit.setStyleSheet("""background-color: transparent;
                                             color: red;
                                             font-size: 15px""")
 
-        def get_weight(self):
-            return int(self.widget.value())
+            # traverse all children depth first to install event filters
+            stack = [self]
+            while stack:
+                widget = stack.pop()
+
+                widget.installEventFilter(self)
+
+                try:
+                    widget.setMouseTracking(True)
+                except AttributeError:
+                    pass
+
+                stack.extend(widget.children())
+
+        def eventFilter(self, obj, event):
+            if event.type() == QtCore.QEvent.MouseButtonPress:
+                if event.button() == Qt.LeftButton:
+                    self.parent().selectEdge(self.edge, event.modifiers() == Qt.ControlModifier)
+            elif event.type() == QtCore.QEvent.MouseMove:
+                self.parent().hoverEdge(self.edge)
+            elif event.type() == QtCore.QEvent.KeyPress:
+                if event.key() == Qt.Key_Delete:
+                    self.parent().deleteSelection()
+
+            return False
 
         def get_edge(self):
             return self.edge
@@ -277,38 +300,15 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         # check if the mouse is hovering over any nodes
         self.hovered_node = None
-        self.hovered_edge = None
         for node, data in self.graph.nodes().data():
             x, y, size, *_ = data.values()
 
             if point_circle_intersect(event.pos(), x, y, size):
                 self.hovered_node = node
                 break
-        else:
-            # check if the mouse is hovering over any edges (this will only run if the mouse isn't hovering over any
-            # nodes)
-            for start_node, end_node in self.graph.edges():
-                if start_node != end_node:
-                    # regular edge
-                    line_x1 = self.graph.nodes[start_node]["x"]
-                    line_y1 = self.graph.nodes[start_node]["y"]
-                    line_x2 = self.graph.nodes[end_node]["x"]
-                    line_y2 = self.graph.nodes[end_node]["y"]
 
-                    if point_line_intersect(event.pos(), line_x1, line_y1, line_x2, line_y2):
-                        self.hovered_edge = (start_node, end_node)
-                        break
-                else:
-                    # loop
-                    x = self.graph.nodes[start_node]["x"]
-                    y = self.graph.nodes[start_node]["y"]
-
-                    rect = QtCore.QRect(x - self.loop_width // 2, y, self.loop_width, self.loop_height)
-                    if rect.contains(event.pos()):
-                        self.hovered_edge = (start_node, end_node)
-                        break
-            else:
-                self.hovered_edge = None
+        # If this event is triggered, the mouse isn't over a child widget, so it cannot be hovering over an edge.
+        self.hovered_edge = None
 
         # panning and moving selected nodes
         if self.panning:
@@ -324,17 +324,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
-            # delete nodes and edges
-            for node in self.selected_nodes:
-                self.graph.remove_node(node)
-
-            for edge in self.selected_edges:
-                if self.graph.has_edge(*edge):
-                    self.graph.remove_edge(*edge)
-
-            self.clearSelection()
-
-        self.update()
+            self.deleteSelection()
 
     def wheelEvent(self, event):
         # zoom
@@ -392,7 +382,20 @@ class EulerGraphWidget(QtWidgets.QWidget):
         # draw edges
         edge_count = Counter()  # keeps track of the number of edges encountered between each node pair
         painter.setBrush(QtGui.QBrush(Qt.NoBrush))
-        for start_node, end_node, data in self.graph.edges(data=True):
+
+        # iterate over edges as 2-tuples or 3-tuples depending on if multi-edges are permitted
+        if self.multi_edge:
+            iterator = self.graph.edges(data=True, keys=True)
+        else:
+            iterator = self.graph.edges(data=True)
+
+        for start_node, end_node, *_ in iterator:
+            data = _[-1]
+            if len(_) == 2:
+                key = _[0]
+            else:
+                key = None
+
             # update and access the edge counter
             edge_count.update([(start_node, end_node), (end_node, start_node)])
             edge_number = edge_count[start_node, end_node] - 1
@@ -403,9 +406,9 @@ class EulerGraphWidget(QtWidgets.QWidget):
             end_y = self.graph.nodes[end_node]["y"]
 
             # style the edge
-            if self.hovered_edge == (start_node, end_node):
+            if self.hovered_edge in [(start_node, end_node), (start_node, end_node, key)]:
                 painter.setPen(hover_pen)
-            elif (start_node, end_node) in self.selected_edges:
+            elif (start_node, end_node) in self.selected_edges or (start_node, end_node, key) in self.selected_edges:
                 painter.setPen(select_pen)
             else:
                 painter.setPen(normal_pen)
@@ -524,6 +527,35 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         self.graph.add_edge(start_node, end_node, widget=widget)
 
+    def selectEdge(self, edge, multi_select=False):
+        if not multi_select:
+            self.clearSelection()
+
+        self.selected_edges.add(edge)
+
+        self.update()
+
+    def hoverEdge(self, edge):
+        self.hovered_edge = edge
+        self.update()
+
+    def deleteSelection(self):
+        # delete nodes
+        for node in self.selected_nodes:
+            for edge in dict(self.graph.edges):
+                if node == edge[0] or node == edge[1]:
+                    self._delete_edge(edge)
+
+            self.graph.remove_node(node)
+
+        # delete edges
+        for edge in self.selected_edges:
+            self._delete_edge(edge)
+
+        self.clearSelection()
+
+        self.update()
+
     def _draw_direction_triangle(self, point1, angle, painter):
         # calculate offset vector along and perpendicular to the line
         offset1 = -QtCore.QPointF(cos(angle) * self.direction_triangle_height,
@@ -537,6 +569,12 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         # draw the triangle
         painter.drawPolygon(point1, point2, point3)
+
+    def _delete_edge(self, edge):
+        if self.graph.has_edge(*edge):
+            widget = self.graph.edges[edge]["widget"]
+            widget.deleteLater()
+            self.graph.remove_edge(*edge)
 
 
 def main():
