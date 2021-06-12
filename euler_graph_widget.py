@@ -143,9 +143,9 @@ def num_edges(start_node, end_node, graph):
 
 
 class EulerGraphWidget(QtWidgets.QWidget):
-    class WidgetOnEdge(QtWidgets.QWidget):
+    class BaseWidgetOnEdge(QtWidgets.QWidget):
         def __init__(self, edge, *args, **kwargs):
-            super(EulerGraphWidget.WidgetOnEdge, self).__init__(*args, **kwargs)
+            super(EulerGraphWidget.BaseWidgetOnEdge, self).__init__(*args, **kwargs)
 
             self.setFixedWidth(20)
             self.setFixedHeight(20)
@@ -187,6 +187,16 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
         def get_edge(self):
             return self.edge
+
+    class BaseWidgetOnNode(QtWidgets.QWidget):
+        def __init__(self, *args, **kwargs):
+            super(EulerGraphWidget.BaseWidgetOnNode, self).__init__(*args, **kwargs)
+
+            self.setFixedWidth(20)
+            self.setFixedHeight(20)
+
+    WidgetOnEdge = BaseWidgetOnEdge
+    WidgetOnNode = BaseWidgetOnNode
 
     def __init__(self, graph, *args, default_node_size=20, default_node_color=Qt.black, hover_colour=Qt.blue,
                  select_colour=Qt.red, zoom_rate=0.01, loop_width=20, loop_height=30, multi_edge_spacing=20,
@@ -366,7 +376,14 @@ class EulerGraphWidget(QtWidgets.QWidget):
             else:
                 painter.setPen(no_pen)
 
+            # draw the node
             painter.drawEllipse(x - size // 2, y - size // 2, size, size)
+
+            # move the widget
+            widget = data["widget"]
+            width = widget.width()
+            height = widget.height()
+            widget.move(x - width // 2, y - height - size // 2)
 
         # draw edges
         edge_count = Counter()  # keeps track of the number of edges encountered between each node pair
@@ -496,7 +513,11 @@ class EulerGraphWidget(QtWidgets.QWidget):
         if color is None:
             color = self.default_node_color
 
-        self.graph.add_node(self.next_node_id, x=x, y=y, size=size, color=color)
+        widget = self.WidgetOnNode(self)
+        widget.show()
+
+        self.graph.add_node(self.next_node_id, x=x, y=y, size=size, color=color, widget=widget)
+
         self.hovered_node = self.next_node_id
         self.next_node_id += 1
 
