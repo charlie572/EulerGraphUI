@@ -576,6 +576,9 @@ class EulerGraphWidget(QtWidgets.QWidget):
         else:
             return self.graph.edges(data=data)
 
+    def nodes(self, data=False):
+        return self.graph.nodes(data=data)
+
     def _draw_direction_triangle(self, point1, angle, painter):
         # calculate offset vector along and perpendicular to the line
         offset1 = -QtCore.QPointF(cos(angle) * self.direction_triangle_height,
