@@ -188,6 +188,9 @@ class EulerGraphWidget(QtWidgets.QWidget):
         def get_edge(self):
             return self.edge
 
+        def get_weight(self):
+            return float(self.line_edit.text())
+
     class BaseWidgetOnNode(QtWidgets.QWidget):
         def __init__(self, *args, **kwargs):
             super(EulerGraphWidget.BaseWidgetOnNode, self).__init__(*args, **kwargs)
@@ -412,7 +415,7 @@ class EulerGraphWidget(QtWidgets.QWidget):
             elif (start_node, end_node) in self.selected_edges or (start_node, end_node, key) in self.selected_edges:
                 painter.setPen(select_pen)
             else:
-                painter.setPen(normal_pen)
+                painter.setPen(data["color"])
 
             # draw the edge
             if start_node != end_node:
@@ -566,15 +569,25 @@ class EulerGraphWidget(QtWidgets.QWidget):
 
     def setNodeColor(self, node, color):
         self.graph.nodes[node]["color"] = color
+        self.update()
 
     def setEdgeColor(self, edge, color):
         self.graph.edges[edge]["color"] = color
+        self.update()
 
-    def edges(self, data=False):
+    def setAllEdgeColors(self, color):
+        for edge in self.edges():
+            self.setEdgeColor(edge, color)
+
+    def setAllNodeColors(self, color):
+        for node in self.nodes():
+            self.setNodeColor(node, color)
+
+    def edges(self, node=None, data=False):
         if self.multi_edge:
-            return self.graph.edges(keys=True, data=data)
+            return self.graph.edges(node, keys=True, data=data)
         else:
-            return self.graph.edges(data=data)
+            return self.graph.edges(node, data=data)
 
     def nodes(self, data=False):
         return self.graph.nodes(data=data)
